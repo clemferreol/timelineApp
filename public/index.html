@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Timeline</title>
+
+    <link rel="stylesheet" href="node_modules/bootstrap/dist/css/bootstrap.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body ng-app="timelineApp" class="container" ng-controller="TimelineController as timeline">
+
+    <div ng-show="timeline.isDisconnected">
+        <h1> Timeline </h1>
+        <h3>Veuillez vous identifier pour accéder à la timeline :</h3>
+        <form class="form-inline" name="loginForm" ng-submit="timeline.loginUser()">
+            <input type="text" class="form-control" placeholder="Pseudo" required ng-model="timeline.pseudo">
+            <input type="submit" class="btn btn-primary" value="Se Connecter">
+        </form>
+    </div>
+
+    <div ng-hide="timeline.isDisconnected">
+        <main class="col-md-9">
+
+            <form class="form-inline" name="messageForm" ng-submit="timeline.sendPost()">
+                <h3>URL de l'image</h3>
+                <input type="url" placeholder="http://" name="website" ng-model="timeline.image">
+                <h3>Texte de la publication</h3>
+                <textarea ng-model="timeline.messageText" required></textarea>
+                <input type="submit" class="btn btn-primary" value="Publier">
+            </form>
+
+
+            <div ng-repeat="post in timeline.posts">
+                <div >
+                    <image ng-src = "{{ post.image }}"></image><br />
+                    <h3> Par {{post.pseudo}}</h3>
+                    <span> Le {{post.date | date:'yyyy-MM-dd'}}</span><br /><br />
+                    <span> {{post.text}} </span><br />
+                    <button  ng-click="deletePost()"> Supprimer </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script src="/node_modules/angular/angular.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        angular
+            .module('timelineApp', [])
+            .controller('TimelineController', function($scope) {
+                var timeline = this;
+
+                timeline.date = new Date();
+                timeline.isDisconnected = true;
+                timeline.users = [];
+                timeline.posts = [];
+                timeline.image = '';
+                timeline.pseudo = '';
+                timeline.messageText = '';
+
+                timeline.loginUser = function() {
+
+                    timeline.isDisconnected = false;
+                    timeline.socket = io('ws://localhost:3000');
+                    timeline.socket.emit('setPseudo', timeline.pseudo);
+
+                    timeline.socket.on('posts', function(posts) {
+                        $scope.$apply();
+                    });
+
+                    timeline.socket.on('post', function(post) {
+                        timeline.posts.push(post);
+                        $scope.$apply();
+                    });
+
+                    timeline.socket.on('image', function(image) {
+                        timeline.posts.push(image);
+                        $scope.$apply();
+                    });
+
+                    timeline.socket.on('date', function(date) {
+                        timeline.posts.push(date);
+                        $scope.$apply();
+                    });
+
+                    timeline.socket.on('newUser', function(newUser) {
+                        timeline.users.push(newUser); // On l'ajoute à notre liste
+                        $scope.$apply(); // Force les changements au niveau de la vue HTML
+                    });
+                };
+
+
+                timeline.sendPost = function() {
+                    if (timeline.messageText.trim() === '') return;
+                    if (timeline.image.trim() === ''){
+                      timeline.image = "http://www.elegantwallpapers.com/wp-content/wallpapers/800x480/04958_800x480.jpg";
+                    }
+
+                    timeline.socket.emit('posts', timeline.posts);
+                    timeline.socket.emit('post', timeline.messageText);
+                    timeline.socket.emit('image', timeline.image);
+                    timeline.socket.emit('date', timeline.date);
+
+
+                    timeline.posts.push( {
+                        pseudo : timeline.pseudo,
+                        text : timeline.messageText,
+                        image : timeline.image,
+                        date : timeline.date
+
+                    } );
+
+                    timeline.messageText = '';
+                    timeline.image = '';
+                };
+
+                timeline.deletePost = function(index){
+
+                }
+
+            });
+
+    </script>
+
+</body>
+</html>
